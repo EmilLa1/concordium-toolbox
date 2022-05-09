@@ -3,7 +3,7 @@ A package of tools for carrying out performance analysis of a node / network.
 
 ## Contents
 
-# Network creator
+# chain
 A small rust program setting up a local chain.
 
 # Analyzer
