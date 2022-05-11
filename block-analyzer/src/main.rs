@@ -69,8 +69,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let mut csv_rows = vec![];
 
-    let mut node_idx = 0;
-    for endpoint in app.endpoints {
+    for (node_idx, endpoint) in app.endpoints.into_iter().enumerate() {
         let mut client = endpoints::Client::connect(endpoint, "rpcadmin".to_string()).await?;
 
         let version = client.version().await?;
@@ -125,7 +124,6 @@ async fn main() -> anyhow::Result<()> {
             }
             cb = bi.block_parent;
         }
-        node_idx += 1;
     }
 
     csv_rows.reverse();
