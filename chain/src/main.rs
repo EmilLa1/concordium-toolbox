@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{bail, Context};
 use clap::AppSettings;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
@@ -57,6 +57,11 @@ struct Config {
         default_value = "300"
     )]
     housekeeping_interval: usize,
+    #[structopt(
+        long = "continue-state",
+        help = "If this is set then the nodes will use existing data directories."
+    )]
+    continue_state: bool,
 }
 
 struct App<'a> {
@@ -140,19 +145,23 @@ fn run_app<B: Backend>(
     let node_path = std::path::PathBuf::from("../deps/concordium-node/concordium-node/")
         .canonicalize()
         .context("invalid node path")?;
+
     for i in 0..cfg.num_nodes {
         log_buffers.push(String::new());
+
+        if !cfg.continue_state {
+            std::fs::remove_dir_all(node_path.join(format!("peer-{}", i)))
+                .context("cannot remove old peer directory.")?;
+        }
 
         // command for creating the baker folder
         let mut mkdir_cmd = Command::new("mkdir");
         mkdir_cmd.current_dir(&node_path);
         mkdir_cmd.arg("-p");
-        mkdir_cmd.arg(format!("baker-{}", i));
-        mkdir_cmd
-            .status()
-            .context("cannot create baker directory")?;
+        mkdir_cmd.arg(format!("peer-{}", i));
+        mkdir_cmd.status().context("cannot create peer directory")?;
 
-        //copy genesis.dat to baker directory cp $GENESIS_ROOT/genesis.dat
+        //copy genesis.dat to peer directory cp $GENESIS_ROOT/genesis.dat
         let mut copy_cmd = Command::new("cp");
         copy_cmd.current_dir(&node_path);
 
@@ -161,7 +170,7 @@ fn run_app<B: Backend>(
             .canonicalize()
             .context("cannot find genesis.dat")?;
         copy_cmd.arg(genesis_dat.to_str().unwrap());
-        copy_cmd.arg(format!("baker-{}", i));
+        copy_cmd.arg(format!("peer-{}", i));
         copy_cmd.status().context("cannot copy genesis.dat")?;
 
         // command for running the node
@@ -173,12 +182,9 @@ fn run_app<B: Backend>(
         cmd.env("CONCORDIUM_NODE_ID", format!("{:016x}", i as u64).as_str());
         cmd.env(
             "CONCORDIUM_NODE_CONFIG_DIR",
-            format!("baker-{:?}", i).as_str(),
+            format!("peer-{:?}", i).as_str(),
         );
-        cmd.env(
-            "CONCORDIUM_NODE_DATA_DIR",
-            format!("baker-{:?}", i).as_str(),
-        );
+        cmd.env("CONCORDIUM_NODE_DATA_DIR", format!("peer-{:?}", i).as_str());
         cmd.env(
             "CONCORDIUM_NODE_RPC_SERVER_PORT",
             format!("{}", i + cfg.rpc_port_offset).as_str(),
