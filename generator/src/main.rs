@@ -17,7 +17,7 @@ struct App {
     #[structopt(
         long = "node",
         help = "GRPC interface of the node.",
-        default_value = "http://localhost:10000"
+        default_value = "http://localhost:7000"
     )]
     endpoint: tonic::transport::Endpoint,
     #[structopt(long = "sender")]
