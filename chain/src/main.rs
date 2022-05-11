@@ -54,7 +54,7 @@ struct Config {
     #[structopt(
         long = "housekeeping-interval",
         help = "Interval in seconds where the node cleans up its connections etc.",
-        default_value = "30"
+        default_value = "300"
     )]
     housekeeping_interval: usize,
 }
@@ -192,12 +192,16 @@ fn run_app<B: Backend>(
             "CONCORDIUM_NODE_CONNECTION_HOUSEKEEPING_INTERVAL",
             format!("{}", cfg.housekeeping_interval).as_str(),
         );
+        cmd.env(
+            "CONCORDIUM_NODE_MAX_NORMAL_KEEP_ALIVE",
+            format!("{}", cfg.housekeeping_interval * 3).as_str(),
+        );
 
         cmd.arg("run");
         cmd.arg("--release");
         cmd.arg("--quiet");
         cmd.arg("--");
-        cmd.args(["-d", "1"]);
+        //        cmd.args(["-d", "1"]);
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
@@ -205,44 +209,28 @@ fn run_app<B: Backend>(
         if cfg.poorly_connected {
             // the nodes will be connected sequentially
             // we submit transactions at the start of the queue.
-            // O - O - O - O - ...
+            // O - O - O - O - B
 
-            // if the node is last in line we don't connect to the one behind us.
-            let next_peer_port = cfg.peer_port_offset + i + 1;
-            let previous_peer_port = cfg.peer_port_offset + i - 1;
-
-            // we're the first peer in line so we only connect to the peer in front of us.
-            if i == 0 {
-                cmd.env(
-                    "CONCORDIUM_NODE_CONNECTION_CONNECT_TO",
-                    format!("127.0.0.1:{}", next_peer_port),
-                );
-            } else if i < cfg.num_nodes - 1 {
-                // we're in the middle so we connect to both sides.
-                cmd.env(
-                    "CONCORDIUM_NODE_CONNECTION_CONNECT_TO",
-                    format!(
-                        "127.0.0.1:{},127.0.0.1:{}",
-                        previous_peer_port, next_peer_port
-                    ),
-                );
-            } else {
-                // we're at the end so we only connect to the peer behind us.
-                cmd.env(
-                    "CONCORDIUM_NODE_CONNECTION_CONNECT_TO",
-                    format!("127.0.0.1:{}", previous_peer_port),
-                );
-            }
-
-            //the last node in line will be baker.
+            // assign the last node to be baker
             if i == cfg.num_nodes - 1 {
                 let baker_credentials = genesis_root
-                    .join(format!("bakers/baker-{}-credentials.json", i))
+                    .join("bakers/baker-0-credentials.json")
                     .canonicalize()
                     .context("Invalid baker credentials")?;
                 cmd.env(
                     "CONCORDIUM_NODE_BAKER_CREDENTIALS_FILE",
                     baker_credentials.to_str().unwrap().to_string().as_str(),
+                );
+            }
+
+            // if the node is last in line we don't connect to the one behind us.
+            let next_peer_port = cfg.peer_port_offset + i + 1;
+
+            // we're the first peer in line so we only connect to the peer in front of us.
+            if i < cfg.num_nodes - 1 {
+                cmd.env(
+                    "CONCORDIUM_NODE_CONNECTION_CONNECT_TO",
+                    format!("127.0.0.1:{}", next_peer_port),
                 );
             }
 
@@ -268,20 +256,18 @@ fn run_app<B: Backend>(
                 );
             }
         } else {
-            // everyone is baker here.
-            let baker_credentials = genesis_root
-                .join(format!("bakers/baker-{}-credentials.json", i))
-                .canonicalize()
-                .context("Invalid baker credentials")?;
-            cmd.env(
-                "CONCORDIUM_NODE_BAKER_CREDENTIALS_FILE",
-                baker_credentials.to_str().unwrap().to_string().as_str(),
-            );
+            // assign first 5 nodes to be bakers
+            if i < 5 {
+                let baker_credentials = genesis_root
+                    .join(format!("bakers/baker-{}-credentials.json", i))
+                    .canonicalize()
+                    .context("Invalid baker credentials")?;
+                cmd.env(
+                    "CONCORDIUM_NODE_BAKER_CREDENTIALS_FILE",
+                    baker_credentials.to_str().unwrap().to_string().as_str(),
+                );
+            }
 
-            cmd.env(
-                "CONCORDIUM_NODE_CONNECTION_DESIRED_NODES",
-                format!("{}", cfg.num_nodes - 1).as_str(),
-            );
             for n in 0..cfg.num_nodes {
                 if i == n {
                     continue;
