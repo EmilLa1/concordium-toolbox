@@ -45,6 +45,10 @@ struct Row {
     block_slot_time: DateTime<Utc>,
     #[serde(rename = "Block propagation time (millis)")]
     block_propagation_time: i64,
+    #[serde(rename = "Baker")]
+    is_baker: bool,
+    #[serde(rename = "Finalizer")]
+    is_finalizer: bool,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -83,6 +87,24 @@ async fn main() -> anyhow::Result<()> {
         let consensus_info = client.get_consensus_status().await?;
         let gb = consensus_info.genesis_block;
         let mut cb = app.start_block.unwrap_or(consensus_info.best_block);
+
+        let (is_baker, is_finalizer) = match ni.peer_details {
+            types::queries::PeerDetails::Bootstrapper => (false, false),
+            types::queries::PeerDetails::Node { consensus_state } => match consensus_state {
+                types::queries::ConsensusState::NotRunning => (false, false),
+                types::queries::ConsensusState::Passive => (false, false),
+                types::queries::ConsensusState::Active { active_state } => match active_state {
+                    types::queries::ActiveConsensusState::NotInCommittee => (false, false),
+                    types::queries::ActiveConsensusState::IncorrectKeys => (false, false),
+                    types::queries::ActiveConsensusState::NotYetActive => (false, false),
+                    types::queries::ActiveConsensusState::Active {
+                        baker_id,
+                        finalizer,
+                    } => (true, finalizer),
+                },
+            },
+        };
+
         while cb != gb {
             let bi = client.get_block_info(&cb).await?;
             if bi.transaction_count != 0 {
@@ -120,6 +142,8 @@ async fn main() -> anyhow::Result<()> {
                     block_slot,
                     block_slot_time,
                     block_propagation_time,
+                    is_baker,
+                    is_finalizer,
                 });
             }
             cb = bi.block_parent;
