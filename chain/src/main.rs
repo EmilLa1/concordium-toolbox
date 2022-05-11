@@ -166,41 +166,45 @@ fn run_app<B: Backend>(
 
         // command for running the node
         let cmd = &mut Command::new("cargo");
-        cmd.env("RUST_BACKTRACE", "full");
         cmd.current_dir(&node_path);
+        cmd.env("RUST_BACKTRACE", "full");
+        cmd.env("CONCORDIUM_NODE_RUNTIME_HASKELL_RTS_FLAGS", &cfg.rts_flags);
+        cmd.env("CONCORDIUM_NODE_CONNECTION_NO_BOOTSTRAP_DNS", "1");
+        cmd.env("CONCORDIUM_NODE_ID", format!("{:016x}", i as u64).as_str());
+        cmd.env(
+            "CONCORDIUM_NODE_CONFIG_DIR",
+            format!("baker-{:?}", i).as_str(),
+        );
+        cmd.env(
+            "CONCORDIUM_NODE_DATA_DIR",
+            format!("baker-{:?}", i).as_str(),
+        );
+        let baker_credentials = genesis_root
+            .join(format!("bakers/baker-{}-credentials.json", i))
+            .canonicalize()
+            .context("Invalid baker credentials")?;
+        cmd.env(
+            "CONCORDIUM_NODE_BAKER_CREDENTIALS_FILE",
+            baker_credentials.to_str().unwrap().to_string().as_str(),
+        );
+        cmd.env(
+            "CONCORDIUM_NODE_RPC_SERVER_PORT",
+            format!("{}", i + cfg.rpc_port_offset).as_str(),
+        );
+        cmd.env(
+            "CONCORDIUM_NODE_LISTEN_PORT",
+            format!("{}", i + cfg.peer_port_offset).as_str(),
+        );
+        cmd.env("CONCORDIUM_NODE_LISTEN_ADDRESS", "0.0.0.0");
+        cmd.env(
+            "CONCORDIUM_NODE_CONNECTION_HOUSEKEEPING_INTERVAL",
+            format!("{}", cfg.housekeeping_interval).as_str(),
+        );
 
         cmd.arg("run");
         cmd.arg("--release");
         cmd.arg("--quiet");
         cmd.arg("--");
-        cmd.args(["--no-bootstrap", format!("{}", 1).as_str()]);
-        cmd.args(["--id", format!("{:016x}", i as u64).as_str()]);
-        cmd.args(["--config-dir", format!("baker-{:?}", i).as_str()]);
-        cmd.args(["--data-dir", format!("baker-{:?}", i).as_str()]);
-
-        let baker_credentials = genesis_root
-            .join(format!("bakers/baker-{}-credentials.json", i))
-            .canonicalize()
-            .context("Invalid baker credentials")?;
-
-        cmd.args([
-            "--baker-credentials-file",
-            baker_credentials.to_str().unwrap().to_string().as_str(),
-        ]);
-        cmd.args([
-            "--rpc-server-port",
-            format!("{}", i + cfg.rpc_port_offset).as_str(),
-        ]);
-        cmd.args([
-            "--listen-port",
-            format!("{}", i + cfg.peer_port_offset).as_str(),
-        ]);
-        cmd.args(["--listen-address", "0.0.0.0"]);
-        //        cmd.args(["--haskell-rts-flags", cfg.rts_flags.to_string().as_str()]);
-        cmd.args([
-            "--housekeeping-interval",
-            format!("{}", cfg.housekeeping_interval).as_str(),
-        ]);
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
@@ -209,11 +213,23 @@ fn run_app<B: Backend>(
             // the nodes will be connected sequentially.
             // O - O - O - O - ...
             if i == 0 || i == cfg.num_nodes - 1 {
-                cmd.args(["--desired-nodes", format!("{}", 1).as_str()]);
-                cmd.args(["--max-allowed-nodes", format!("{}", 1).as_str()]);
+                cmd.env(
+                    "CONCORDIUM_NODE_CONNECTION_DESIRED_NODES",
+                    format!("{}", 1).as_str(),
+                );
+                cmd.env(
+                    "CONCORDIUM_NODE_CONNECTION_MAX_ALLOWED_NODES",
+                    format!("{}", 1).as_str(),
+                );
             } else {
-                cmd.args(["--desired-nodes", format!("{}", 2).as_str()]);
-                cmd.args(["--max-allowed-nodes", format!("{}", 2).as_str()]);
+                cmd.env(
+                    "CONCORDIUM_NODE_CONNECTION_DESIRED_NODES",
+                    format!("{}", 2).as_str(),
+                );
+                cmd.env(
+                    "CONCORDIUM_NODE_CONNECTION_MAX_ALLOWED_NODES",
+                    format!("{}", 2).as_str(),
+                );
             }
 
             let next_peer_port = if i == cfg.num_nodes {
@@ -226,7 +242,10 @@ fn run_app<B: Backend>(
                 format!("127.0.0.1:{:?}", next_peer_port).as_str(),
             ]);
         } else {
-            cmd.args(["--desired-nodes", format!("{}", cfg.num_nodes - 1).as_str()]);
+            cmd.env(
+                "CONCORDIUM_NODE_CONNECTION_DESIRED_NODES",
+                format!("{}", cfg.num_nodes - 1).as_str(),
+            );
             for n in 0..cfg.num_nodes {
                 if i == n {
                     continue;
@@ -344,10 +363,12 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, logs: &[String]) -> anyhow::Resul
 }
 
 fn view_log(line: String, node_num: u32) -> anyhow::Result<Paragraph<'static>> {
+    let scroll_offset = 0;
     Ok(Paragraph::new(line)
         .style(Style::default().bg(Color::White).fg(Color::Black))
         .alignment(Alignment::Left)
         .wrap(Wrap { trim: true })
+        .scroll((scroll_offset as u16, 0))
         .block(
             Block::default()
                 .title(format!("Node {:?}", node_num))
