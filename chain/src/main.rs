@@ -27,10 +27,10 @@ struct Config {
     )]
     num_nodes: usize,
     #[structopt(
-        long = "well-connected",
-        help = "If every node should be connected to eachother or they should be connected sequentially"
+        long = "poorly-connected",
+        help = "default the network will be well connected. If poorly-connected is chosen then every peer will have connection to at most 2 peers."
     )]
-    optimal_connected: bool,
+    poorly_connected: bool,
     #[structopt(
         long = "genesis-root",
         help = "Path to genesis_data",
@@ -173,54 +173,69 @@ fn run_app<B: Backend>(
         cmd.arg("--release");
         cmd.arg("--quiet");
         cmd.arg("--");
-        cmd.arg("--no-bootstrap 1");
-        cmd.arg(format!("--id {:?}", i));
-        cmd.arg(format!("--config-dir baker-{:?}", i));
-        cmd.arg(format!("--data-dir baker-{:?}", i));
+        cmd.args(["--no-bootstrap", format!("{}", 1).as_str()]);
+        cmd.args(["--id", format!("{:016x}", i as u64).as_str()]);
+        cmd.args(["--config-dir", format!("baker-{:?}", i).as_str()]);
+        cmd.args(["--data-dir", format!("baker-{:?}", i).as_str()]);
 
         let baker_credentials = genesis_root
             .join(format!("bakers/baker-{}-credentials.json", i))
             .canonicalize()
             .context("Invalid baker credentials")?;
 
-        cmd.arg(format!(
-            "--baker-credentials-file {}",
-            baker_credentials.to_str().unwrap()
-        ));
-        cmd.arg(format!("--rpc-server-port {:?}", i + cfg.rpc_port_offset));
-        cmd.arg(format!("--listen-port {:?}", i + cfg.peer_port_offset));
-        cmd.arg("--listen-address 0.0.0.0");
-        cmd.arg(format!("--haskell-rts-flags {:?}", cfg.rts_flags));
-        cmd.arg(format!(
-            "--housekeeping-interval {:?}",
-            cfg.housekeeping_interval
-        ));
+        cmd.args([
+            "--baker-credentials-file",
+            baker_credentials.to_str().unwrap().to_string().as_str(),
+        ]);
+        cmd.args([
+            "--rpc-server-port",
+            format!("{}", i + cfg.rpc_port_offset).as_str(),
+        ]);
+        cmd.args([
+            "--listen-port",
+            format!("{}", i + cfg.peer_port_offset).as_str(),
+        ]);
+        cmd.args(["--listen-address", "0.0.0.0"]);
+        //        cmd.args(["--haskell-rts-flags", cfg.rts_flags.to_string().as_str()]);
+        cmd.args([
+            "--housekeeping-interval",
+            format!("{}", cfg.housekeeping_interval).as_str(),
+        ]);
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
         // every node is connected to eachother
-        if cfg.optimal_connected {
-            cmd.arg(format!("--desired-nodes {:?}", cfg.num_nodes - 1));
-            for n in 0..cfg.num_nodes {
-                if i == n {
-                    continue;
-                }
-                cmd.arg(format!(
-                    "--connect-to 127.0.0.1:{:?}",
-                    n + cfg.peer_port_offset
-                ));
-            }
-        } else {
+        if cfg.poorly_connected {
             // the nodes will be connected sequentially.
             // O - O - O - O - ...
-            cmd.arg(format!("--desired-nodes {:?}", 1));
-            cmd.arg(format!("--max-allowed-nodes {:?}", 1));
+            if i == 0 || i == cfg.num_nodes - 1 {
+                cmd.args(["--desired-nodes", format!("{}", 1).as_str()]);
+                cmd.args(["--max-allowed-nodes", format!("{}", 1).as_str()]);
+            } else {
+                cmd.args(["--desired-nodes", format!("{}", 2).as_str()]);
+                cmd.args(["--max-allowed-nodes", format!("{}", 2).as_str()]);
+            }
+
             let next_peer_port = if i == cfg.num_nodes {
                 cfg.num_nodes - 1
             } else {
                 i + 1
             };
-            cmd.arg(format!("--connect-to 127.0.0.1:{:?}", next_peer_port));
+            cmd.args([
+                "--connect-to",
+                format!("127.0.0.1:{:?}", next_peer_port).as_str(),
+            ]);
+        } else {
+            cmd.args(["--desired-nodes", format!("{}", cfg.num_nodes - 1).as_str()]);
+            for n in 0..cfg.num_nodes {
+                if i == n {
+                    continue;
+                }
+                cmd.args([
+                    "--connect-to",
+                    format!("127.0.0.1:{}", n + cfg.peer_port_offset).as_str(),
+                ]);
+            }
         }
 
         let mut fork = cmd
@@ -238,11 +253,13 @@ fn run_app<B: Backend>(
                 for _ in 0..10 {
                     buf_reader.read_line(&mut buffered_line).unwrap();
                 }
-                sender
-                    .send(buffered_line)
-                    .await
-                    .context("mpsc sender failed")
-                    .unwrap();
+                if !buffered_line.is_empty() {
+                    sender
+                        .send(buffered_line)
+                        .await
+                        .context("mpsc sender failed")
+                        .unwrap();
+                }
             }
         };
         tokio::spawn(reader);
@@ -266,6 +283,9 @@ fn run_app<B: Backend>(
         if let Event::Key(key) = event::read()? {
             match key.code {
                 KeyCode::Char('q') => {
+                    for mut receiver in stdout_receivers {
+                        receiver.close();
+                    }
                     for mut f in forks {
                         f.kill()?;
                     }
