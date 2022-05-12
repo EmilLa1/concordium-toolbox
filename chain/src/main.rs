@@ -150,8 +150,8 @@ fn run_app<B: Backend>(
         log_buffers.push(String::new());
 
         if !cfg.continue_state {
-            std::fs::remove_dir_all(node_path.join(format!("peer-{}", i)))
-                .context("cannot remove old peer directory.")?;
+            let _ = std::fs::remove_dir_all(node_path.join(format!("peer-{}", i)))
+                .context("cannot remove old peer directory.");
         }
 
         // command for creating the baker folder
