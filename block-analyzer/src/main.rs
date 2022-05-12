@@ -17,10 +17,15 @@ struct App {
         default_value = "http://localhost:7000,http://localhost:7001,http://localhost:7002,http://localhost:7003,http://localhost:7004"
     )]
     endpoints: Vec<tonic::transport::Endpoint>,
-    #[structopt(long = "block")]
+    #[structopt(long = "block", help = "hash of the block to start with")]
     start_block: Option<types::hashes::BlockHash>,
     #[structopt(long = "out", help = "File to output the measurements to.")]
     out: Option<std::path::PathBuf>,
+    #[structopt(
+        long = "include-empty-blocks",
+        help = "Whether if empty blocks should be included in the batch"
+    )]
+    include_empty_blocks: bool,
 }
 
 #[derive(SerdeSerialize)]
@@ -107,7 +112,7 @@ async fn main() -> anyhow::Result<()> {
 
         while cb != gb {
             let bi = client.get_block_info(&cb).await?;
-            if bi.transaction_count != 0 {
+            if bi.transaction_count != 0 || app.include_empty_blocks {
                 let block_hash = bi.block_hash;
                 println!("{}", node_uris[node_idx]);
                 println!("{}", block_hash);
