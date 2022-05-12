@@ -27,10 +27,10 @@ struct Config {
     )]
     num_nodes: usize,
     #[structopt(
-        long = "poorly-connected",
-        help = "default the network will be well connected. If poorly-connected is chosen then every peer will have connection to at most 2 peers."
+        long = "optimal-connected",
+        help = "default the peers in the network will be connected in line. If optimal-connected is chosen then every peer will have connection to all other peers."
     )]
-    poorly_connected: bool,
+    optimal_connected: bool,
     #[structopt(
         long = "genesis-root",
         help = "Path to genesis_data",
@@ -211,8 +211,7 @@ fn run_app<B: Backend>(
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        // every node is connected to eachother
-        if cfg.poorly_connected {
+        if !cfg.optimal_connected {
             // the nodes will be connected sequentially
             // we submit transactions at the start of the queue.
             // O - O - O - O - B

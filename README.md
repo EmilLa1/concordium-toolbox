@@ -15,7 +15,7 @@ Run the following from the `deps/concordium-node/scripts/genesis` directory.
 USE_DOCKER= PURGE= NUM_BAKERS=1 NUM_EXTRA_ACCOUNTS=20 EXTRA_ACCOUNTS_TEMPLATE=test EXTRA_ACCOUNTS_BALANCE=10000 ./generate-test-genesis.py
 ```
 
-For an optimal connected network use 
+Or for an optimal connected network use 
 
 ```bash
 USE_DOCKER= PURGE= NUM_BAKERS=5 NUM_EXTRA_ACCOUNTS=20 EXTRA_ACCOUNTS_TEMPLATE=test EXTRA_ACCOUNTS_BALANCE=10000 ./generate-test-genesis.py
