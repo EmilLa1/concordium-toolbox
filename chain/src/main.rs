@@ -62,6 +62,8 @@ struct Config {
         help = "If this is set then the nodes will use existing data directories."
     )]
     continue_state: bool,
+    #[structopt(long = "no-emit-logs", help = "If true no log files will be emitted.")]
+    emit_logs: bool,
 }
 
 struct App<'a> {
@@ -154,24 +156,15 @@ fn run_app<B: Backend>(
                 .context("cannot remove old peer directory.");
         }
 
-        // command for creating the baker folder
-        let mut mkdir_cmd = Command::new("mkdir");
-        mkdir_cmd.current_dir(&node_path);
-        mkdir_cmd.arg("-p");
-        mkdir_cmd.arg(format!("peer-{}", i));
-        mkdir_cmd.status().context("cannot create peer directory")?;
+        std::fs::create_dir_all(format!("peer-{}", i)).context("Cannot create peer directory")?;
 
-        //copy genesis.dat to peer directory cp $GENESIS_ROOT/genesis.dat
-        let mut copy_cmd = Command::new("cp");
-        copy_cmd.current_dir(&node_path);
-
+        //copy genesis.dat to peer directory.
         let genesis_dat = genesis_root
             .join("genesis.dat")
             .canonicalize()
             .context("cannot find genesis.dat")?;
-        copy_cmd.arg(genesis_dat.to_str().unwrap());
-        copy_cmd.arg(format!("peer-{}", i));
-        copy_cmd.status().context("cannot copy genesis.dat")?;
+        std::fs::copy(genesis_dat, format!("peer-{}", i))
+            .context("Cannot copy genesis dat to peer directory")?;
 
         // command for running the node
         let cmd = &mut Command::new("cargo");
