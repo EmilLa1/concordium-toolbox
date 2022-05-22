@@ -1,11 +1,11 @@
-use anyhow::{bail, Context};
+use anyhow::Context;
 use clap::AppSettings;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Write};
 use std::process::Command;
 use std::process::Stdio;
 use structopt::StructOpt;
@@ -63,7 +63,7 @@ struct Config {
     )]
     continue_state: bool,
     #[structopt(long = "no-emit-logs", help = "If true no log files will be emitted.")]
-    emit_logs: bool,
+    no_emit_logs: bool,
 }
 
 struct App<'a> {
@@ -201,7 +201,9 @@ fn run_app<B: Backend>(
         cmd.arg("--release");
         cmd.arg("--quiet");
         cmd.arg("--");
-        cmd.args(["-d", "1"]);
+        if !cfg.no_emit_logs {
+            cmd.args(["-d", "1"]);
+        }
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
@@ -282,7 +284,16 @@ fn run_app<B: Backend>(
             .spawn()
             .context(format!("Failed to launch node {:?}", i))?;
 
-        let mut buf_reader = BufReader::new(fork.stderr.take().context("Could not take stdout")?);
+        let mut fh = if !cfg.no_emit_logs {
+            Some(
+                std::fs::File::create(format!("peer-{}.log", i))
+                    .context(format!("cannot create log file for peer {}", i))?,
+            )
+        } else {
+            None
+        };
+
+        let mut buf_reader = BufReader::new(fork.stderr.take().context("Could not take stderr")?);
         forks.push(fork);
         // create a channel for reading stdout of the forked process.
         let (sender, receiver) = tokio::sync::mpsc::channel(100);
@@ -294,6 +305,14 @@ fn run_app<B: Backend>(
                     buf_reader.read_line(&mut buffered_line).unwrap();
                 }
                 if !buffered_line.is_empty() {
+                    // write to log file if enabled
+                    match fh {
+                        Some(ref mut fh) => fh.write(buffered_line.clone().as_bytes()),
+                        None => Ok(0),
+                    }
+                    .context("Failed to write log")
+                    .unwrap();
+                    // send to ui
                     sender
                         .send(buffered_line)
                         .await
