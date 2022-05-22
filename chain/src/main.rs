@@ -5,7 +5,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::process::Command;
 use std::process::Stdio;
 use structopt::StructOpt;
@@ -202,7 +202,7 @@ fn run_app<B: Backend>(
         cmd.arg("--quiet");
         cmd.arg("--");
         if !cfg.no_emit_logs {
-            cmd.args(["-d", "1"]);
+            //            cmd.args(["-d", "1"]);
         }
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
