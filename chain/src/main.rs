@@ -144,7 +144,8 @@ fn run_app<B: Backend>(
     let genesis_root = std::path::PathBuf::from(&cfg.genesis_root)
         .canonicalize()
         .context("invalid genesis path")?;
-    let node_path = std::path::PathBuf::from("../deps/concordium-node/concordium-node/")
+    let path_to_node = "../deps/concordium-node/concordium-node/Cargo.toml";
+    let node_path = std::path::PathBuf::from(path_to_node)
         .canonicalize()
         .context("invalid node path")?;
 
@@ -163,12 +164,11 @@ fn run_app<B: Backend>(
             .join("genesis.dat")
             .canonicalize()
             .context("cannot find genesis.dat")?;
-        std::fs::copy(genesis_dat, format!("peer-{}", i))
+        std::fs::copy(genesis_dat, format!("peer-{}/genesis.dat", i))
             .context("Cannot copy genesis dat to peer directory")?;
 
         // command for running the node
         let cmd = &mut Command::new("cargo");
-        cmd.current_dir(&node_path);
         cmd.env("RUST_BACKTRACE", "full");
         cmd.env("CONCORDIUM_NODE_RUNTIME_HASKELL_RTS_FLAGS", &cfg.rts_flags);
         cmd.env("CONCORDIUM_NODE_CONNECTION_NO_BOOTSTRAP_DNS", "1");
@@ -197,10 +197,11 @@ fn run_app<B: Backend>(
         );
 
         cmd.arg("run");
+        cmd.args(["--manifest-path", path_to_node]);
         cmd.arg("--release");
         cmd.arg("--quiet");
         cmd.arg("--");
-        //        cmd.args(["-d", "1"]);
+        cmd.args(["-d", "1"]);
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
