@@ -20,10 +20,7 @@ start the chain via `cargo run` in the `chain/` directory.
 
 
 ## generate transactions
-create transactions e.g.
-```bash
-cargo run -- --node http://127.0.0.1:7000 --sender ../deps/concordium-node/scripts/genesis/genesis_data/bakers/baker-account-0.json --receivers ../deps/concordium-node/scripts/genesis/genesis_data/tests/receivers.json --tps 400
-```
+https://github.com/Concordium/concordium-rust-sdk/blob/main/examples/generator.rs
 
 where `receivers.json` is the extracted addresses from `deps/concordium-node/scripts/genesis/genesis_data/tests/tests.json`
 
