@@ -22,8 +22,6 @@ start the chain via `cargo run` in the `chain/` directory.
 ## generate transactions
 https://github.com/Concordium/concordium-rust-sdk/blob/main/examples/generator.rs
 
-where `receivers.json` is the extracted addresses from `deps/concordium-node/scripts/genesis/genesis_data/tests/tests.json`
-
 ## analyze blocks
 run `cargo run` in the `block-analyzer/` directory. Use `--out foo.csv` to get a csv file. 
 
