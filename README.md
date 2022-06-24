@@ -38,12 +38,13 @@ where `receivers.json` is the extracted addresses from `deps/concordium-node/scr
 ## analyze blocks
 run `cargo run` in the `block-analyzer/` directory. Use `--out foo.csv` to get a csv file. 
 
+## process monitoring
+run `cargo run` in the `process-metrics/` directory. Use `--out foo.csv` to get a csv file.
 
-### perf profiling
-build haskell with sources with `-g`
+## perf profiling
+Build haskell with sources with `-g`
 
-
-#### record
+### record
 perf record -p ID1,ID2 -F 99 -ag -- sleep 120
 
 #### collect data
