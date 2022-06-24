@@ -1,7 +1,5 @@
 # Concordium toolbox
 
-
-
 # Setup
 
 ## Consensus
@@ -21,34 +19,19 @@ Or for an optimal connected network use
 USE_DOCKER= PURGE= NUM_BAKERS=5 NUM_EXTRA_ACCOUNTS=20 EXTRA_ACCOUNTS_TEMPLATE=test EXTRA_ACCOUNTS_BALANCE=10000 ./generate-test-genesis.py
 ```
 
-# run the test
-
 ## start chain
 start the chain via `cargo run` in the `chain/` directory.
 
-
 ## generate transactions
-create transactions e.g.
-```bash
-cargo run -- --node http://127.0.0.1:7000 --sender ../deps/concordium-node/scripts/genesis/genesis_data/bakers/baker-account-0.json --receivers ../deps/concordium-node/scripts/genesis/genesis_data/tests/receivers.json --tps 400
-```
-
-where `receivers.json` is the extracted addresses from `deps/concordium-node/scripts/genesis/genesis_data/tests/tests.json`
+https://github.com/Concordium/concordium-rust-sdk/blob/main/examples/generator.rs
 
 ## analyze blocks
 run `cargo run` in the `block-analyzer/` directory. Use `--out foo.csv` to get a csv file. 
 
+## analyze logs
+run `cargo run` in the `log-analyzer/` directory.Supply log file with `--in foo.log` Use `--out foo.csv` to get a csv file. 
+
+where `receivers.json` is the extracted addresses from `deps/concordium-node/scripts/genesis/genesis_data/tests/tests.json`
+
 ## process monitoring
 run `cargo run` in the `process-metrics/` directory. Use `--out foo.csv` to get a csv file.
-
-## perf profiling
-Build haskell with sources with `-g`
-
-### record
-perf record -p ID1,ID2 -F 99 -ag -- sleep 120
-
-#### collect data
-perf report
-    
-#### get a flamegraph (https://github.com/brendangregg/FlameGraph)
-perf script | ./stackcollapse-perf.pl | ./flamegraph.pl > perf-concordium-node.svg
