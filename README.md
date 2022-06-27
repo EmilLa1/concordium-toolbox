@@ -6,15 +6,9 @@
 run `stack build` from the `deps/concordium-node/concordium-consensus` directory.
 
 ## Genesis
-For the poorly connected network create a genesis with 1 baker: 
+Run `generate-test-genesis.py` from the `deps/concordium-node/scripts/genesis` directory.
 
-Run the following from the `deps/concordium-node/scripts/genesis` directory.
-```bash
-USE_DOCKER= PURGE= NUM_BAKERS=1 NUM_EXTRA_ACCOUNTS=20 EXTRA_ACCOUNTS_TEMPLATE=test EXTRA_ACCOUNTS_BALANCE=10000 ./generate-test-genesis.py
-```
-
-Or for an optimal connected network use 
-
+E.g.
 ```bash
 USE_DOCKER= PURGE= NUM_BAKERS=5 NUM_EXTRA_ACCOUNTS=20 EXTRA_ACCOUNTS_TEMPLATE=test EXTRA_ACCOUNTS_BALANCE=10000 ./generate-test-genesis.py
 ```
