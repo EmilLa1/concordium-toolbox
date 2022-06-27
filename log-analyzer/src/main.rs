@@ -13,9 +13,11 @@ use structopt::StructOpt;
 arg_enum! {
     #[derive(Debug)]
     enum Metric {
-        // get the block execution by subtracting the block receive time from
+        // Get the block execution by subtracting the block receive time from
         // block arrive time. Note. the log must've been obtained via debug
         BlockExecution,
+        // Get the startup time of the node.
+        StartupTime,
     }
 }
 
@@ -66,10 +68,32 @@ fn main() -> anyhow::Result<()> {
         .iter()
         .any(|m| matches!(m, Metric::BlockExecution));
 
+    let mut startup_time = cfg.metrics.iter().any(|m| matches!(m, Metric::StartupTime));
+
     let mut parsing = false;
     let mut block_height = 0;
+    let mut startup_time_start = None;
 
     for line in lines {
+        if !block_execution && !startup_time {
+            break;
+        }
+
+        if startup_time {
+            if line.contains("Starting up the consensus layer") {
+                startup_time_start = Some(extract_timestamp(&line.to_string())?);
+            } else if line.contains("Consensus layer started") {
+                let startup_time_end = extract_timestamp(&line.to_string())?;
+                if let Some(startup_time_start) = startup_time_start {
+                    println!(
+                        "Consensus started up in {}",
+                        startup_time_end - startup_time_start
+                    );
+                    startup_time = false;
+                }
+            }
+        }
+
         if block_execution {
             if !parsing && line.contains("Skov: Received block") {
                 parsing = true;

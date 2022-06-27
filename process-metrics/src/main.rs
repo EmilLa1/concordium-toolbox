@@ -20,9 +20,9 @@ struct Row {
     disk_read: u64,
     #[serde(rename = "Disk write (kb)")]
     disk_write: u64,
-    #[serde(rename = "kb/s")]
+    #[serde(rename = "Disk read kb/s")]
     disk_read_per_sec: u64,
-    #[serde(rename = "kb/s")]
+    #[serde(rename = "Disk write kb/s")]
     disk_write_per_sec: u64,
     #[serde(rename = "Disk read total (kb)")]
     disk_read_total: u64,

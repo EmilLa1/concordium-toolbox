@@ -155,17 +155,19 @@ fn run_app<B: Backend>(
         if !cfg.continue_state {
             let _ = std::fs::remove_dir_all(node_path.join(format!("peer-{}", i)))
                 .context("cannot remove old peer directory.");
+
+            // create the new peer directory
+            std::fs::create_dir_all(format!("peer-{}", i))
+                .context("Cannot create peer directory")?;
+
+            //copy genesis.dat to peer directory.
+            let genesis_dat = genesis_root
+                .join("genesis.dat")
+                .canonicalize()
+                .context("cannot find genesis.dat")?;
+            std::fs::copy(genesis_dat, format!("peer-{}/genesis.dat", i))
+                .context("Cannot copy genesis dat to peer directory")?;
         }
-
-        std::fs::create_dir_all(format!("peer-{}", i)).context("Cannot create peer directory")?;
-
-        //copy genesis.dat to peer directory.
-        let genesis_dat = genesis_root
-            .join("genesis.dat")
-            .canonicalize()
-            .context("cannot find genesis.dat")?;
-        std::fs::copy(genesis_dat, format!("peer-{}/genesis.dat", i))
-            .context("Cannot copy genesis dat to peer directory")?;
 
         // command for running the node
         let cmd = &mut Command::new("cargo");
