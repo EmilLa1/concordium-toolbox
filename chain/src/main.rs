@@ -5,7 +5,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, BufRead, BufReader, Write};
 use std::process::Command;
 use std::process::Stdio;
 use structopt::StructOpt;
@@ -64,6 +64,12 @@ struct Config {
     continue_state: bool,
     #[structopt(long = "no-emit-logs", help = "If true no log files will be emitted.")]
     no_emit_logs: bool,
+    #[structopt(
+        long = "accounts-cache-size",
+        help = "The size of the accounts cache size",
+        default_value = "40000"
+    )]
+    accounts_cache_size: usize,
 }
 
 struct App<'a> {
@@ -196,6 +202,10 @@ fn run_app<B: Backend>(
         cmd.env(
             "CONCORDIUM_NODE_MAX_NORMAL_KEEP_ALIVE",
             format!("{}", cfg.housekeeping_interval * 3).as_str(),
+        );
+        cmd.env(
+            "CONCORDIUM_NODE_CONSENSUS_ACCOUNTS_CACHE_SIZE",
+            format!("{}", cfg.accounts_cache_size),
         );
 
         cmd.arg("run");
