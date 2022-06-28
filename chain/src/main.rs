@@ -281,7 +281,7 @@ fn run_app<B: Backend>(
                 );
             }
 
-            for n in 0..cfg.num_nodes {
+            for n in i..cfg.num_nodes {
                 if i == n {
                     continue;
                 }
