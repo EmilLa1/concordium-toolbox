@@ -2,9 +2,9 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use clap::AppSettings;
 use serde_derive::Serialize;
-use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
+use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
 
@@ -14,8 +14,12 @@ struct Row {
     time: DateTime<Utc>,
     #[serde(rename = "Cpu usage (%)")]
     cpu_usage: f32,
-    #[serde(rename = "Memory usage (kb)")]
-    memory_usage: u64,
+    #[serde(rename = "Res Memory usage (kb)")]
+    res_memory_usage: u64,
+    #[serde(rename = "Anon Memory usage (kb)")]
+    anon_memory_usage: u64,
+    #[serde(rename = "File Memory usage (kb)")]
+    file_memory_usage: u64,
     #[serde(rename = "Disk read (kb)")]
     disk_read: u64,
     #[serde(rename = "Disk write (kb)")]
@@ -87,8 +91,35 @@ fn main() -> anyhow::Result<()> {
             anyhow::bail!("Unknown pid");
         };
 
+        let mut anon_mem = None;
+        let mut file_mem = None;
+        let proc_status_contents = fs::read_to_string(format!("/proc/{}/status", pid))
+            .context("Unable to read from /proc. Are you running as sudo?")?;
+
+        for line in proc_status_contents.lines() {
+            if line.contains("RssAnon") {
+                let rss_anon = line.chars().filter(|c| c.is_numeric()).collect::<String>();
+                anon_mem = Some(rss_anon.parse::<u64>().context("Cannot parse RssAnon")?);
+            } else if line.contains("RssFile") {
+                let rss_file = line.chars().filter(|c| c.is_numeric()).collect::<String>();
+                file_mem = Some(rss_file.parse::<u64>().context("Cannot parse RssFile")?);
+            }
+        }
+
+        let anon_memory_usage = if let Some(mem) = anon_mem {
+            mem
+        } else {
+            anyhow::bail!("Could not retrieve RssAnon");
+        };
+
+        let file_memory_usage = if let Some(mem) = file_mem {
+            mem
+        } else {
+            anyhow::bail!("Could not retrieve RssFile");
+        };
+
         let cpu_usage = proc.cpu_usage();
-        let memory_usage = proc.memory();
+        let res_memory_usage = proc.memory();
         let disk_usage = proc.disk_usage();
 
         let disk_read = disk_usage.read_bytes;
@@ -103,7 +134,9 @@ fn main() -> anyhow::Result<()> {
         csv_rows.push(Row {
             time,
             cpu_usage,
-            memory_usage,
+            res_memory_usage,
+            anon_memory_usage,
+            file_memory_usage,
             disk_read,
             disk_write,
             disk_read_per_sec,
@@ -112,12 +145,14 @@ fn main() -> anyhow::Result<()> {
             disk_write_total,
         });
         println!(
-            "{}/{} | Time {} | CPU {}% | Mem {} MB | Disk Read {} KB/s | Disk Write {} KB/s",
+            "{}/{} | Time {} | CPU {}% | Res Mem {} MB | Anon Mem {} MB | File Mem {} | Disk Read {} KB/s | Disk Write {} KB/s",
             i,
             iterations,
             time,
             cpu_usage,
-            memory_usage / 1000,
+            res_memory_usage/ 1000,
+            anon_memory_usage / 1000,
+            file_memory_usage / 1000,
             disk_read_per_sec,
             disk_write_per_sec
         );
