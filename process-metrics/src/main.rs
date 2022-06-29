@@ -93,8 +93,17 @@ fn main() -> anyhow::Result<()> {
 
         let mut anon_mem = None;
         let mut file_mem = None;
-        let proc_status_contents = fs::read_to_string(format!("/proc/{}/status", pid))
-            .context("Unable to read from /proc. Are you running as sudo?")?;
+        let proc_status_contents = match fs::read_to_string(format!("/proc/{}/status", pid)) {
+            Ok(contents) => contents,
+            Err(_) => {
+                for row in csv_rows {
+                    if let Some(ref mut writer) = out {
+                        writer.serialize(row).context("Unable to write csv row")?;
+                    }
+                }
+                anyhow::bail!("Unable to read from /proc. Is the process running? Or are you not running as sudo?");
+            }
+        };
 
         for line in proc_status_contents.lines() {
             if line.contains("RssAnon") {
